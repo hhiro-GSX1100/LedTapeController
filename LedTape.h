@@ -69,7 +69,7 @@ class LedTape
 		void setAllColors(TColor c, ExecMode m = AutoSend);
 		void setColor(int pos, byte r, byte g, byte b, ExecMode m = AutoSend);
 		void setColor(int pos, TColor c, ExecMode m = AutoSend);
-		TColor getColor(int pos);
+		void getColor(int pos, TColor *c);
 		void clearAllColors();
 		void setAllBrightness(byte br);
 		void setBrightness(int pos, byte br);
