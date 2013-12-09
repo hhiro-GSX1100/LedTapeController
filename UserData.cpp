@@ -44,7 +44,7 @@ void UserData::initialize(bool initMemoryOffset){
 	EEPROM.write(getMemoryPoint(eUserLedMode), (byte)'a');	//初期値：'a'
 	EEPROM.write(getMemoryPoint(eUserBrightness), 0x80);	//初期値：128
 	EEPROM.write(getMemoryPoint(eExecMode), 0x00);			//初期値：0
-	EEPROM.write(getMemoryPoint(MIN_DELAY_TIME), 0x0A);		//初期値：10
+	EEPROM.write(getMemoryPoint(eDelayTime), 0x14);			//初期値：20
 	
 	EEPROM.write(getMemoryPoint(eInit), 0x80);				//設定完了値：0x80
 };
