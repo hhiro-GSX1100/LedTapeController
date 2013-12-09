@@ -136,18 +136,16 @@ void LedTape::setColor(int pos, TColor c, ExecMode m){
 };
 
 //セットされている色の取得
-TColor LedTape::getColor(int pos){
-	TColor c;
+void LedTape::getColor(int pos, TColor *c){
 	if(pos >= 0 && pos < numLEDs){
-		c.red = p_pixels[COLOR_RGB * pos + 0];
-		c.green = p_pixels[COLOR_RGB * pos + 1];
-		c.blue = p_pixels[COLOR_RGB * pos + 2];
+		c->red = p_pixels[COLOR_RGB * pos + 0];
+		c->green = p_pixels[COLOR_RGB * pos + 1];
+		c->blue = p_pixels[COLOR_RGB * pos + 2];
 	}else{
-		c.red = 0x00;
-		c.green = 0x00;
-		c.blue = 0x00;
+		c->red = 0x00;
+		c->green = 0x00;
+		c->blue = 0x00;
 	}
-	return c;
 };
 
 void LedTape::clearAllColors(){

@@ -30,7 +30,7 @@ void funcLighting(TColor tc, char mc, int mi);
 void funcColorflowChg(char mc);
 void funcLightingAllColorChg(char mc);
 void funcRainbow(char mc);
-void funcGradient(char mc, unsigned long ms = 25);
+void funcGradient(char mc);
 void funcEguchiStar(TColor tc, char mc, int mi, unsigned long ms = 100);
 void funcOff(char mc, unsigned long ms);
 
@@ -65,7 +65,7 @@ LedTape ledtape;
 const byte iMod = 8;			//モードの分母（固定）
 const int DATA_LENGTH = 30;		//設定データのByte数
 const unsigned long KURUKI_LED_DELAY = 30;	//デバッグ用KURUMI LED Deley値
-const int MIN_DELAY_TIME = 10;
+const int MIN_DELAY_TIME = 5;
 enum ExecMode{ eExecLED, eUser, eSettings, eRequest };
 //　変数宣言
 enum ExecMode exec_mode;				//実行モード値（0=動作、1=設定、2=ユーザーモード）
@@ -301,6 +301,8 @@ bool chkUserModeChange(char Current_LED_Mode){
 // "L00"		個数		最大輝度		使用輝度		DelayTime	0			0			0			0			"END"		***LED　Params　設定 保存
 // "I00"		0			0			0			0			0			0			0			0			"END"		***Initialize　保存
 // "I01"		MemOffset	0			0			0			0			0			0			0			"END"		***MemoryOffset　保存
+// "I10"		使用輝度		0			0			0			0			0			0			0			"END"		***使用輝度変更　非保存
+// "I11"		DelayTime	0			0			0			0			0			0			0			"END"		***DelayTime 非保存		
 //****************************************************************
 void funcSettings(){
 	if(exec_mode != eSettings) return; 
@@ -313,41 +315,42 @@ void funcSettings(){
 			//* LED Params 設定
 			//*********************************************************
 			case 'L':
-				//消灯
-				ledtape.clearAllColors();
-				ledtape.send();
-				//funcKurumiLEDBlue();		//*********************CHK
-				//delay(1000);
-				intLEDs = getNumberTo3CharArray(UpDATA, 3); 
-				//LED個数保存　最大255個
-				if(intLEDs > 0x00 && intLEDs <= 0xFF){
-					//メモリ格納
-					userdata.setLEDs(int2byte(intLEDs));
-					//現在の実行値修正
-					LED_length = int2byte(intLEDs);
-					ledtape.setLEDs(LED_length);
-				}
-				//輝度保存
-				intMax = getNumberTo3CharArray(UpDATA, 6);
-				intUse = getNumberTo3CharArray(UpDATA, 9);
-				intDelayTime = getNumberTo3CharArray(UpDATA, 12);
-				bMax = int2byte(intMax);
-				bUse = int2byte(intUse);
-				if(intMax > 0 && intMax <= 0xFF){
-					if(intMax < intUse){
-						bUse = bMax;
+				if(UpDATA[1] == '0' && UpDATA[2] == '0'){
+					//消灯
+					ledtape.clearAllColors();
+					ledtape.send();
+					//funcKurumiLEDBlue();		//*********************CHK
+					//delay(1000);
+					intLEDs = getNumberTo3CharArray(UpDATA, 3); 
+					//LED個数保存　最大255個
+					if(intLEDs > 0x00 && intLEDs <= 0xFF){
+						//メモリ格納
+						userdata.setLEDs(int2byte(intLEDs));
+						//現在の実行値修正
+						LED_length = int2byte(intLEDs);
+						ledtape.setLEDs(LED_length);
 					}
-					userdata.setMaxBrightness(bMax);
-					userdata.setUseBrightness(bUse);	
+					//輝度保存
+					intMax = getNumberTo3CharArray(UpDATA, 6);
+					intUse = getNumberTo3CharArray(UpDATA, 9);
+					intDelayTime = getNumberTo3CharArray(UpDATA, 12);
+					bMax = int2byte(intMax);
+					bUse = int2byte(intUse);
+					if(intMax > 0 && intMax <= 0xFF){
+						if(intMax < intUse){
+							bUse = bMax;
+						}
+						userdata.setMaxBrightness(bMax);
+						userdata.setUseBrightness(bUse);	
+					}
+					USE_brightness = bUse;
+					MAX_brightness = bMax;
+					if(0 <= intDelayTime && intDelayTime <= 100){
+						bDelayTime = int2byte(intDelayTime);
+						userdata.setDelayTime(bDelayTime);
+						delayTime = MIN_DELAY_TIME + intDelayTime;				
+					}
 				}
-				USE_brightness = bUse;
-				MAX_brightness = bMax;
-				if(0 <= intDelayTime && intDelayTime <= 100){
-					bDelayTime = int2byte(intDelayTime);
-					userdata.setDelayTime(bDelayTime);
-					delayTime = MIN_DELAY_TIME + intDelayTime;				
-				}
-				
 				break;
 
 			//*********************************************************
@@ -382,6 +385,12 @@ void funcSettings(){
 					iCounter = (int)userdata.getMoveCount();
 					MAX_brightness = userdata.getMaxBrightness();
 
+				}else if(UpDATA[1] == '1' && UpDATA[2] == '0'){
+					//　輝度の一時設定
+					USE_brightness = (byte)getNumberTo3CharArray(UpDATA, 3);	
+				}else if(UpDATA[1] == '1' && UpDATA[2] == '1'){
+					// DelayTimeの一時設定
+					delayTime = (byte)(MIN_DELAY_TIME + getNumberTo3CharArray(UpDATA, 3));
 				}
 				break;
 			
@@ -431,6 +440,10 @@ void funcRequest(){
 				Serial2.print(funcNum2Str(userdata.getMemoryOffset(),3));
 				Serial2.print(funcNum2Str(userdata.getDelayTime(),3));
 				Serial2.print("END");
+				
+				//使用輝度とdelayTimeは初期値を読み込む。（一時変更の対応のため）
+				USE_brightness = userdata.getUseBrightness();	
+				delayTime = MIN_DELAY_TIME + userdata.getDelayTime();
 				//funcKurumiLEDFechsia();
 				//delay(1000);
 			}
@@ -543,7 +556,8 @@ void funcExec(){
 	if(exec_mode != eExecLED) return;
 	
 	userdata.setExecMode((byte)eExecLED);
-	USE_brightness = userdata.getUseBrightness();	
+	//USE_brightness = userdata.getUseBrightness();	
+	//delayTime = MIN_DELAY_TIME + userdata.getDelayTime();
 	
 	while(true){
 		if(exec_mode != eExecLED) return;
@@ -675,7 +689,8 @@ void rainbowCycle(byte wait, char mc) {
        Wheel(i, ((i * 256 / LED_length) + j) & 255);
     }
     ledtape.send();
-    delay(wait);
+	delay(wait);
+    //delay(wait + (delayTime - MIN_DELAY_TIME));
 	if(chkModeChange(mc)) return;
   }
 }
@@ -808,7 +823,7 @@ void funcLightingAllColorChg(char mc){
 	while(true){
 		for(int i = 0; i < 7; ++i){
 			ledtape.setAllColors(g_t_color[i]);
-			delay(1000);
+			delay(delayTime * 40);
 			if(chkModeChange(mc)) return;
 		}
     }
@@ -829,7 +844,7 @@ void funcRainbow(char mc){
     }
 }
 
-void funcGradient(char mc, unsigned long ms){
+void funcGradient(char mc){
 	ledtape.setAllBrightness(USE_brightness);
 	TColor tmp_c[LED_length];
 	TColor tc;
@@ -846,7 +861,7 @@ void funcGradient(char mc, unsigned long ms){
 		tc.green = 0xFF;
 		tc.blue = 0xFF;
 		ledtape.setAllColors(tc);
-		delay(ms);
+		delay(delayTime);
 		//外ループ
 		for(int i = 0; i < 3; ++i){
 			for(int j = 0; j < 4; ++j){
@@ -895,7 +910,7 @@ void funcGradient(char mc, unsigned long ms){
 						ledtape.setColor(k, tmp_c[k], LedTape::NoClearAndNoSend);
 					}
 					ledtape.send();
-					delay(ms);
+					delay(delayTime);
 					if(chkModeChange(mc)) return;
 				}while(0 < x && x < 0xFF);		
 			}
@@ -951,7 +966,7 @@ void funcStar1_User(char mc){
 		//delay(1);
 		ledtape.clearAllColors();
 		int random_delay_time = random(5, 150);
-		delay(random_delay_time);
+		delay(random_delay_time + (delayTime - MIN_DELAY_TIME));
 		if(chkUserModeChange(mc)) return;
 	}
 }
