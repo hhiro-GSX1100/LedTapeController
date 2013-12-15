@@ -87,7 +87,7 @@ void LedTape::FreeMemorys(){
 // 全LEDの色を更新する
 void LedTape::setAllColors(byte r, byte g, byte b, ExecMode m)
 {
-    // 指定色ですべてのLED情報を更新する。※シリアルテープへは、g,r,bの順のデータ
+    // 指定色ですべてのLED情報を更新する。
     for(int i = 0 ; i < numLEDs ; i++){
         p_pixels[COLOR_RGB * i + 0] = r;
         p_pixels[COLOR_RGB * i + 1] = g;
@@ -98,7 +98,7 @@ void LedTape::setAllColors(byte r, byte g, byte b, ExecMode m)
 // 全LEDの色を更新する
 void LedTape::setAllColors(TColor c, ExecMode m)
 {
-    // 指定色ですべてのLED情報を更新する。※シリアルテープへは、g,r,bの順のデータ
+    // 指定色ですべてのLED情報を更新する。
     for(int i = 0 ; i < numLEDs ; i++){
         p_pixels[COLOR_RGB * i + 0] = c.red;
         p_pixels[COLOR_RGB * i + 1] = c.green;

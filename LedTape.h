@@ -1,4 +1,14 @@
-﻿#ifndef _LEDTAPE_H_
+﻿//*************************************************************************************************
+//* Author: hiro 2013/12/13
+//* スイッチサイエンスのシリアルLED用のクラス
+//* 送信データのタイミングの問題からPINに直接アサインする。
+//* よって使用するPINは　#define LED_PIN_NO, #define LED_PIN で定義 
+//* インスタンス化後には必ず LedTape::setup() を実行すること。
+//*
+//* 以下の関数のCopyrightは「Kazuyuki Eguchi」氏
+//* send24bit, wait_T0H, wait_T0L, wait_T1H, wait_T1L, test 
+//*************************************************************************************************
+#ifndef _LEDTAPE_H_
 #define _LEDTAPE_H_
 
 #include <RLduino78.h>

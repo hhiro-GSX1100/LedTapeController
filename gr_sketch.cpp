@@ -1,28 +1,34 @@
 ﻿/*GR-KURUMI Sketch Template Version: E0.94*/
+//*************************************************************************************************
+//* Author: hiro 2013/12/13
+//*************************************************************************************************
 #include <RLduino78.h>
 #include "iodefine.h"
 #include "LedTape.h"
 #include "UserData.h"
-
-//*********************************************************************
-// Pin 22,23,24 are assigned to RGB LEDs.
-int led_red   = 22; // LOW active
-int led_green = 23; // LOW active
-int led_blue  = 24; // LOW active
+#include "ColorLED.h"
 
 //*********************************************************************
 //　関数定義
-void funcSettings();
+//*********************************************************************
+bool loadUserData(int point = -1);
+void StartAutoPlay(byte strat_mem_pos, byte end_mem_pos);
+void NextAutoPlay();
+void StopAutoPlay();
+bool funcSettings();
+bool funcUserSettings();
+bool funcRequest();
 void funcExec();
 void funcUserExec();
-void funcRequest();
-bool funcUserSettings();
 void funcInitializeUserData();
 bool chkModeChange(char mc);
 bool chkUserModeChange(char mc);
+bool chkAutoPlay();
 bool funcReadDATA(int ReadByte, bool save = true);
-void rainbowCycle(byte wait);
+
+void rainbowCycle(byte wait, char mc);
 void Wheel(int index, byte WheelPos);
+
 void funcStar(TColor tc, char mc, int mi);
 void funcStar1(TColor tc, char mc, int mi, bool b_randam = false);
 volatile void funcStar2(TColor tc, char mc, int mi, bool b_randam = false);
@@ -46,27 +52,26 @@ int funcCharArray2Num(char ch[], int len = 3);
 int getNumberTo3CharArray(char ch[],int start = 0);
 byte int2byte(int val);
 void funcUpDATAInitialize();
-void funcKurumiLEDRed();
-void funcKurumiLEDGreen();
-void funcKurumiLEDBlue();
-void funcKurumiLEDYellow();
-void funcKurumiLEDAqua();
-void funcKurumiLEDFechsia();
-void funcKurumiLEDWhite();
+void autoPlay();
+
 //*********************************************************************
 // インスタンス宣言
+//*********************************************************************
 //ROM用インスタンス
 UserData userdata;
 //LedTapeインスタンス
 LedTape ledtape;
+//ColorLEDインスタンス
+ColorLED kurumiLED;
 
 //*********************************************************************
 // 定数宣言
+//*********************************************************************
 const byte iMod = 8;			//モードの分母（固定）
 const int DATA_LENGTH = 30;		//設定データのByte数
-const unsigned long KURUKI_LED_DELAY = 30;	//デバッグ用KURUMI LED Deley値
-const int MIN_DELAY_TIME = 5;
-enum ExecMode{ eExecLED, eUser, eSettings, eRequest };
+const unsigned long KURUMI_LED_DELAY = 30;	//デバッグ用KURUMI LED Deley値
+const int MIN_DELAY_TIME = 1;
+enum ExecMode{ eExecLED, eUser};
 //　変数宣言
 enum ExecMode exec_mode;				//実行モード値（0=動作、1=設定、2=ユーザーモード）
 char LED_Mode = 'a';			//LEDの動作モード 特に、設定モードは'X'
@@ -82,6 +87,14 @@ TColor g_t_color[7];
 TColor g_t_off, g_t_on;
 TColor TCUser;						//ユーザーモード用
 int delayTime = 10;
+//AutoPlay用変数
+bool AutoPlay = false;
+bool bolFuncCheckOut = false;
+int autoplay_start_point = 0, autoplay_end_point = 0;
+int autoplay_point = 0;
+int autoplay_loops = 5;	//autoplay実行回数値
+int autoplay_loop_count = 0;	//autoplayカウンタ
+
 
 //*********************************************************************
 //* SETUP
@@ -89,9 +102,10 @@ int delayTime = 10;
 void setup() {
 	//*****************************************************************
 	// UserData初期化
-	//userdata.setMemoryOffset(0);
 	userdata.setup();	//UserDataセットアップ　インスタンス化後に必ず呼ぶ必要がある。
-	
+	//kurumi LED setup
+	kurumiLED.setup();
+	kurumiLED.setDelay(KURUMI_LED_DELAY);
 	//TColor定義
 	g_t_color[0].red = 0xFF;
 	g_t_color[0].green = 0x00;
@@ -123,20 +137,7 @@ void setup() {
 	
 	//**********************************************************************
 	// 格納データの読み込み
-	LED_length = (byte)userdata.getLEDs();
-	USE_brightness = (byte)userdata.getUseBrightness();
-	LED_Mode = (char)userdata.getLedMode();
-	iCounter = (int)userdata.getMoveCount();
-	MAX_brightness = (byte)userdata.getMaxBrightness();
-	User_LED_Mode = (char)userdata.getUserLedMode();
-	USER_brightness = (byte)userdata.getUserBrightness();
-	userdata.getUserColor(&TCUser);
-	if((int)(userdata.getExecMode()) == eExecLED){
-		exec_mode = eExecLED;
-	}else{
-		exec_mode = eUser;
-	}
-	delayTime = MIN_DELAY_TIME + userdata.getDelayTime();
+	loadUserData();
 	
 	//**********************************************************************
 	// 初期化 ledtapeセットアップ
@@ -144,43 +145,36 @@ void setup() {
 	funcUpDATAInitialize();
 	Serial2.begin(9600);
 	
-	//**********************************************************************
-	// KURUMI LED 初期設定
-	pinMode(led_red, OUTPUT);
-	pinMode(led_green, OUTPUT);
-	pinMode(led_blue, OUTPUT);
-	digitalWrite(led_red, HIGH);
-	digitalWrite(led_green, HIGH);
-	digitalWrite(led_blue, HIGH);
-	funcKurumiLEDWhite();
+	kurumiLED.White();
 	delay(500);
+	
+	//AUTOPLAY
+	if(userdata.getAutoPlay() == 1){
+		StartAutoPlay(userdata.getAutoPlayFrom(), userdata.getAutoPlayTo());
+	} 
+	
 }
 
 //*********************************************************************
 //* LOOP eExecLED, eSettings, eUser
 //*********************************************************************
 void loop() {
+	//AutoPlay
+	NextAutoPlay();
+	
 	switch(exec_mode){
 		//実行順には注意すること。
 		case eExecLED:
-			funcKurumiLEDBlue();
+			kurumiLED.Blue();
 			funcExec();
 			break;
 		case eUser:
-			funcKurumiLEDYellow();
+			kurumiLED.Yellow();
 			funcUserExec();
-			break;
-		case eRequest:
-			funcKurumiLEDAqua();
-			funcRequest();
-			break;
-		case eSettings:
-			funcKurumiLEDGreen();
-			funcSettings();
 			break;
 		default:
 			chkModeChange(LED_Mode);	//障害が起きても復旧可能とする。
-			funcKurumiLEDRed();
+			kurumiLED.Red();
 			delay(1000);
 			break;
 	}
@@ -189,126 +183,251 @@ void loop() {
 //*********************************************************************
 //* 関数定義
 //*********************************************************************
-//*********************************************************************
-//* ledtape初期値設定
-//*********************************************************************
+bool loadUserData(int point){
+	// 格納データの読み込み
+	if(point == -1){
+		LED_length = (byte)userdata.getLEDs();
+		USE_brightness = (byte)userdata.getUseBrightness();
+		LED_Mode = (char)userdata.getLedMode();
+		iCounter = (int)userdata.getMoveCount();
+		MAX_brightness = (byte)userdata.getMaxBrightness();
+		User_LED_Mode = (char)userdata.getUserLedMode();
+		USER_brightness = (byte)userdata.getUserBrightness();
+		userdata.getUserColor(&TCUser);
+		if((int)(userdata.getExecMode()) == eExecLED){
+			exec_mode = eExecLED;
+		}else{
+			exec_mode = eUser;
+		}
+		delayTime = MIN_DELAY_TIME + userdata.getDelayTime();
+	}else{
+		//******************************************************
+		//以下は基本的にAutoPlay用の読み込みに使用する。
+		//よって、LEDの数は今のところ変更しないが、将来LEDの数も変更する場合はコメントを外す。
+		//読み込み確認
+		byte b_point = int2byte(point);
+		if(!userdata.isEnableOffsetRange(b_point)) return false;
+		if(!userdata.isInitData(b_point)) return false;
+		//読み込み
+		//LED_length = (byte)userdata.getLEDs(b_point);
+		//ledtape.setLEDs(LED_length);
+		USE_brightness = (byte)userdata.getUseBrightness(b_point);
+		LED_Mode = (char)userdata.getLedMode(b_point);
+		iCounter = (int)userdata.getMoveCount(b_point);
+		//ファンクションを作成していないので注意
+		//MAX_brightness = (byte)userdata.getMaxBrightness(b_point);
+		User_LED_Mode = (char)userdata.getUserLedMode(b_point);
+		USER_brightness = (byte)userdata.getUserBrightness(b_point);
+		userdata.getUserColor(b_point, &TCUser);
+		if((int)(userdata.getExecMode(b_point)) == eExecLED){
+			exec_mode = eExecLED;
+		}else{
+			exec_mode = eUser;
+		}
+		delayTime = MIN_DELAY_TIME + userdata.getDelayTime(b_point);	
+	}
+	return true;
+}
+//　メモリの初期化
 void funcInitializeUserData(){
 	//メモリ格納位置を変更できるようにする場合はここを注意すること。
 	userdata.setMemoryOffset((byte)0);
 	userdata.initialize();
 }
+
 //*********************************************************************
 //* モードチェンジチェック関数
 //* 戻り値：　変更があれば　true、無ければ　false
 //*********************************************************************
 bool chkModeChange(char Current_LED_Mode){
 	if (Serial2.available() > 0){
+		//autoplay対応
+		StopAutoPlay();
+		
 		byte Tmp_LED_Mode = Serial2.read();
-		//読み込んだ値がセッティングモードではない場合　値をメモリに格納してモードチェンジ
+		//読み込んだ値がセッティングモードではない場合　モードチェンジ
 		if(Tmp_LED_Mode < 'A' || Tmp_LED_Mode > 'Z'){
 			LED_Mode = Tmp_LED_Mode;
 			//　カウントアップ
-			if(LED_Mode >= '1' && LED_Mode <= '7'){
-				++iCounter;
-			}
-			//　カウントデータ保存
-			if((int)'a' <= LED_Mode && LED_Mode <= (int)'d'){
-				++iCounter;
+			++iCounter;
+			//*********************************************************
+			//* データ保存はパラメータ保存時に行うように変更
+			//*　カウントデータ保存
+			//if((int)'a' <= LED_Mode && LED_Mode <= (int)'d'){
 				//データ格納
-				userdata.setMoveCount((byte)(iCounter % 8));
-			}
+			//	userdata.setMoveCount((byte)(iCounter % 8));
+			//}
 			//LED動作モード格納
-			if(LED_Mode != Current_LED_Mode){
-				if((int)'a' <= LED_Mode && LED_Mode <= (int)'h'){
-					userdata.setLedMode(LED_Mode);
-				}
-			}
+			//if(LED_Mode != Current_LED_Mode){
+			//	if((int)'a' <= LED_Mode && LED_Mode <= (int)'i'){
+			//		userdata.setLedMode(LED_Mode);
+			//	}
+			//}
 			return LED_Mode == Current_LED_Mode ? false : true;
 		}
 		
 		if(Tmp_LED_Mode == (byte)'X'){
-			exec_mode = eSettings;
-			//データ読み込み
-			return funcReadDATA(DATA_LENGTH);
+			return funcSettings();
 		}else if(Tmp_LED_Mode == (byte)'Y'){
 			//ユーザーモードへ変更
-			//ユーザーモードに入る入り方は、実行モード時に'Y'を送信する。つまりここと、リクエストで'R03'を送信する場合があるので注意。
 			exec_mode = eUser;
 			return true;
 		}else if(Tmp_LED_Mode == (byte)'Z'){
-			exec_mode = eRequest;
-			//データ読み込み
-			return funcReadDATA(DATA_LENGTH);
+			//データ読み込み、実行
+			return funcRequest();
 		}else if(Tmp_LED_Mode == (byte)'U'){	//'U'はユーザーモード時のデータなので入ってきても捨てる。
 			//データ空読み込み
 			funcReadDATA(21, false);
 		}
-		//その他の場合は変更しない。
 		return false;
-    }
-	//読み込めない場合は変更しない。
-	return false;
+    }else{
+		//読み込めない場合。
+		return false;
+	}
 };
 //*********************************************************************
 //* ユーザーモードチェンジチェック関数
-//* ユーザーモードに入ったら、Uxxxxx・・・のデータしか来ない！他に来るのは実行モードのデータのみ
 //* 戻り値：　変更があれば　true、無ければ　false
+//* ユーザーモードに入ったら、Uxxxxx・・・のデータしか来ない！他に来るのは実行モードのデータのみ
 //*********************************************************************
 bool chkUserModeChange(char Current_LED_Mode){
 	if (Serial2.available() > 0){
+		//autoplay対応
+		StopAutoPlay();
+		
 		funcUpDATAInitialize();
-		//先頭データを除く
+		//先頭データを覗く
 		byte Tmp_LED_Mode = Serial2.peek();
 		//読み込んだ値がユーザーモードのデータではない場合
 		if(Tmp_LED_Mode != (byte)'U'){
 			//ユーザーモードではない場合は読み出し
 			byte Tmp_LED_Mode = Serial2.read();
 			if(Tmp_LED_Mode == (byte)'X'){
-				exec_mode = eSettings;
-				//データ読み込み
-				return funcReadDATA(DATA_LENGTH);
+				return funcSettings();
 			}else if(Tmp_LED_Mode == (byte)'Y'){
-				return false;
+				//ユーザーモードへ変更
+				exec_mode = eUser;
+				return true;
 			}else if(Tmp_LED_Mode == (byte)'Z'){
-				exec_mode = eRequest;
-				//データ読み込み
-				return funcReadDATA(DATA_LENGTH);
+				return funcRequest();
 			}else{
 				//実行モード用の値に変更する。
 				exec_mode = eExecLED;
 				LED_Mode = Tmp_LED_Mode;
-				//userdata.setExecMode((byte)0x01);		funcExecの先頭で保存するように変更
-				//USE_brightness = userdata.getUseBrightness();		
 				return true;
 			}
+			return false;
 		}else{
 			//ユーザモードでの設定をする
 			return funcUserSettings();
 		}
 	}else{
+		//読み込めない場合。
 		return false;
 	}
-	//読み込めない場合
-	return false;
 };
-
+//*********************************************************************
+//AutoPlay 指定のループ数を超えたら再読み込み。
+//*********************************************************************
+bool chkAutoPlay(){
+	if(AutoPlay){
+		if(autoplay_loops < 1){
+			autoplay_loop_count = 0;
+			bolFuncCheckOut = true;
+			return true;
+		}
+		
+		if(autoplay_loop_count < autoplay_loops - 1){
+			++autoplay_loop_count;
+			return false; 
+		}else{
+			autoplay_loop_count = 0;
+			bolFuncCheckOut = true;
+			return true;
+		}
+	}
+	return false;
+}
+// AutoPlayを実行する
+void StartAutoPlay(byte strat_mem_pos, byte end_mem_pos){
+	if(AutoPlay) return;
+	//範囲に有効なデータが１つは存在する事を確認する
+	if(strat_mem_pos >= end_mem_pos) return;
+	if(end_mem_pos > UserData::MAX_OFFSET_VALUE) end_mem_pos = UserData::MAX_OFFSET_VALUE;
+	bool ExistsData = false;
+	for(int i = strat_mem_pos; i <= end_mem_pos; ++i){
+		if(userdata.isInitData(i)){
+			ExistsData = true;
+			break;
+		}
+	}
+	//範囲に有効なループカウントが１つは存在する事を確認する。
+	bool ExistsLoopNumber = false;
+	for(int i = strat_mem_pos; i <= end_mem_pos; ++i){
+		if(userdata.getLoops(i) > 0){
+			ExistsLoopNumber = true;
+			break;
+		}
+	}	
+	if(ExistsData && ExistsLoopNumber){
+		autoplay_start_point = strat_mem_pos;
+		autoplay_end_point = end_mem_pos;
+		AutoPlay = true;
+		autoplay_loop_count = 0;
+		autoplay_point = autoplay_start_point - 1;
+		bolFuncCheckOut = false;
+	}
+}
+//次に進める
+void NextAutoPlay(){
+	//kurumiLED.Red();
+	//delay(1000);
+	if(!AutoPlay) return;
+	bolFuncCheckOut = false;
+	do{
+		if(autoplay_point >= autoplay_end_point){
+			autoplay_point = autoplay_start_point;
+		}else{
+			++autoplay_point;
+		}
+	}while(!loadUserData(autoplay_point));
+	autoplay_loops = userdata.getLoops(int2byte(autoplay_point));
+	if(userdata.getLoopExecMode(int2byte(autoplay_point)) == 0x00){;
+		exec_mode = eExecLED;
+	}else{
+		exec_mode = eUser;
+	}
+}
+// AutoPlayを止める
+void StopAutoPlay(){
+	if(!AutoPlay) return;
+	AutoPlay = false;
+	autoplay_loop_count = 0;
+	userdata.setAutoPlay(0x00);
+	loadUserData();
+}
 //****************************************************************
 //* セッティング関数
-//　'X'
+//　認識文字	'X'
 // Setting String Format 合計30byte 
 //	0			1			2			3			4			5			6			7			8			9
 // 3byte		3byte		3byte		3byte		3byte		3byte		3byte		3byte		3byte		3byte		
-// "L00"		個数		最大輝度		使用輝度		DelayTime	0			0			0			0			"END"		***LED　Params　設定 保存
+// "L00"		個数		最大輝度		使用輝度		DelayTime	Loop回数	AutoMode	0			0			"END"		***LED　Params　設定 保存
 // "I00"		0			0			0			0			0			0			0			0			"END"		***Initialize　保存
 // "I01"		MemOffset	0			0			0			0			0			0			0			"END"		***MemoryOffset　保存
+// "I02"		AutoPlay	From		To			0			0			0			0			0			"END"		***AutoPlay用の値設定 保存
+// "I03"		MemOffset	0			0			0			0			0			0			0			"END"		***メモリクリア
 // "I10"		使用輝度		0			0			0			0			0			0			0			"END"		***使用輝度変更　非保存
 // "I11"		DelayTime	0			0			0			0			0			0			0			"END"		***DelayTime 非保存		
 //****************************************************************
-void funcSettings(){
-	if(exec_mode != eSettings) return; 
+bool funcSettings(){
+	//初期化と読み込み
+	funcUpDATAInitialize();
+	if(!funcReadDATA(DATA_LENGTH)) return false;
+	
 	//読み込み判定、終わりが「END」であるか？
 	if(UpDATA[27] == 'E' && UpDATA[28] == 'N' && UpDATA[29] == 'D'){
-		int intLEDs, intMax, intUse, intDelayTime;
+		int intLEDs, intMax, intUse, intDelayTime, intLoops, intAutoMode;
 		byte bMax, bUse, bDelayTime;
 		switch(UpDATA[0]){
 			//*********************************************************
@@ -350,8 +469,29 @@ void funcSettings(){
 						userdata.setDelayTime(bDelayTime);
 						delayTime = MIN_DELAY_TIME + intDelayTime;				
 					}
+					//**********************************************
+					//動作モードはここで保存するように変更　2013/12/15
+					//LED動作モード格納
+					if((int)'a' <= LED_Mode && LED_Mode <= (int)'i'){
+						userdata.setLedMode(LED_Mode);
+					}
+					if((int)'a' <= LED_Mode && LED_Mode <= (int)'d'){
+						//データ格納
+						userdata.setMoveCount((byte)(iCounter % 8));
+					}
+					userdata.setExecMode((byte)eExecLED);
+					
+					//AutoPlayパラメータ保存
+					intLoops = getNumberTo3CharArray(UpDATA, 15);
+					intAutoMode = getNumberTo3CharArray(UpDATA, 18);
+					userdata.setLoops(int2byte(intLoops));
+					if(intAutoMode == 0){
+						userdata.setLoopExecMode(0x00);
+					}else{
+						userdata.setLoopExecMode(0x01);
+					}
 				}
-				break;
+				return true;
 
 			//*********************************************************
 			//* Initialize
@@ -371,6 +511,8 @@ void funcSettings(){
 					iCounter = (int)userdata.getMoveCount();
 					MAX_brightness = userdata.getMaxBrightness();
 					
+					return true;
+					
 				//メモリ位置変更
 				}else if(UpDATA[1] == '0' && UpDATA[2] == '1'){
 					byte b_tmp = int2byte(getNumberTo3CharArray(UpDATA, 3));
@@ -384,53 +526,67 @@ void funcSettings(){
 					LED_Mode = (char)userdata.getLedMode();
 					iCounter = (int)userdata.getMoveCount();
 					MAX_brightness = userdata.getMaxBrightness();
+					
+					return true;
 
+				}else if(UpDATA[1] == '0' && UpDATA[2] == '2'){
+					byte b_tmp = int2byte(getNumberTo3CharArray(UpDATA, 3));
+					if(b_tmp == 1) userdata.setAutoPlay(0x01);
+					byte b_from = int2byte(getNumberTo3CharArray(UpDATA, 6));
+					byte b_to = int2byte(getNumberTo3CharArray(UpDATA, 9));
+					userdata.setAutoPlayFrom(b_from);
+					userdata.setAutoPlayTo(b_to);
+					
+					//Execute Auto Play
+					StartAutoPlay(b_from, b_to);
+					
+					return true;
+
+				}else if(UpDATA[1] == '0' && UpDATA[2] == '3'){
+					byte b_tmp = int2byte(getNumberTo3CharArray(UpDATA, 3));
+					if(b_tmp == userdata.getMemoryOffset()) return false;
+					userdata.clear(b_tmp);
+					
+					return false;
+					
 				}else if(UpDATA[1] == '1' && UpDATA[2] == '0'){
 					//　輝度の一時設定
-					USE_brightness = (byte)getNumberTo3CharArray(UpDATA, 3);	
+					USE_brightness = (byte)getNumberTo3CharArray(UpDATA, 3);
+					return true;
 				}else if(UpDATA[1] == '1' && UpDATA[2] == '1'){
 					// DelayTimeの一時設定
 					delayTime = (byte)(MIN_DELAY_TIME + getNumberTo3CharArray(UpDATA, 3));
+					return true;
 				}
 				break;
 			
 			default:
 				break;
 		}
-		
-		//*********************************************************
-		//* リブートメッセージ
-		//*********************************************************
-		//funcKurumiLEDRed();	//*********************CHK
-		//リブートメッセージ
-		//ledtape.setAllColors(g_t_on);
-		//delay(100);
-		//ledtape.setAllColors(g_t_off);
-		//delay(100);
 	}
-	//実行モードにする。
-	LED_Mode = (char)userdata.getLedMode();
-	exec_mode = eExecLED;
-	funcUpDATAInitialize();
+	return false;
 }
 //****************************************************************
 //* 送信関数
-//　’Z'
-// Setting String Format 合計30byte 
+//　認識文字	’Z'
+// Request String Format 合計30byte 
 //	0			1			2			3			4			5			6			7			8			9
 // 3byte		3byte		3byte		3byte		3byte		3byte		3byte		3byte		3byte		3byte		
 // "R01"		0			0			0			0			0			0			0			0			"END"		***LED設定等送信要求
-// "R02"		LED個数		最大輝度		使用輝度		ﾒﾓﾘｵﾌｾｯﾄ値	DelayTime	"END"		***返信	
+// "R02"		LED個数		最大輝度		使用輝度		ﾒﾓﾘｵﾌｾｯﾄ値	DelayTime	Loop回数	AutoMode	"END"		***返信	
 // "R03"		0			0			0			0			0			0			0			0			"END"		***ユーザモード設定送信要求
 // "R04"		動作Mode	輝度		R値			G値			B値			"END"		***返信	
+// "R05"		0			0			0			0			0			0			0			0			"END"		***AUTOPLAY　FROM　TO 設定送信要求
+// "R06"		FROM		TO			"END"		***返信	
 //****************************************************************
-void funcRequest(){
-	if(exec_mode != eRequest) return; 
+bool funcRequest(){
+	//初期化と読み込み
+	funcUpDATAInitialize();
+	if(!funcReadDATA(DATA_LENGTH)) return false;
+	
 	//読み込み判定、終わりが「END」であるか？
 	if(UpDATA[27] == 'E' && UpDATA[28] == 'N' && UpDATA[29] == 'D'){
 		if(UpDATA[0] == 'R'){
-			//funcKurumiLEDYellow();
-			//delay(1000);
 			//R01の場合の返信
 			if(UpDATA[1] == '0' && UpDATA[2] == '1'){
 				Serial2.print("R02");
@@ -439,13 +595,15 @@ void funcRequest(){
 				Serial2.print(funcNum2Str(userdata.getUseBrightness(),3));
 				Serial2.print(funcNum2Str(userdata.getMemoryOffset(),3));
 				Serial2.print(funcNum2Str(userdata.getDelayTime(),3));
+				Serial2.print(funcNum2Str(userdata.getLoops(),3));
+				Serial2.print(funcNum2Str(userdata.getLoopExecMode(),3));
 				Serial2.print("END");
 				
 				//使用輝度とdelayTimeは初期値を読み込む。（一時変更の対応のため）
 				USE_brightness = userdata.getUseBrightness();	
 				delayTime = MIN_DELAY_TIME + userdata.getDelayTime();
-				//funcKurumiLEDFechsia();
-				//delay(1000);
+				exec_mode = eExecLED;
+				return true;
 			}
 			//R03の場合の返信
 			if(UpDATA[1] == '0' && UpDATA[2] == '3'){
@@ -459,24 +617,27 @@ void funcRequest(){
 				Serial2.print(funcNum2Str(TCUser.green,3));
 				Serial2.print(funcNum2Str(TCUser.blue,3));
 				Serial2.print("END");
-				//ユーザーモードにリターンする。
-				//ユーザーモードに入る入り方は、実行モード時に'Y'を送信する。及びリクエストで'R03'を送信する場合、つまりここの場合があるので注意。
 				exec_mode = eUser;
-				return;
+				return true;
+			}
+			//R05の場合の返信
+			if(UpDATA[1] == '0' && UpDATA[2] == '5'){
+				//動作Mode	輝度		R値			G値			B値
+				Serial2.print("R06");
+				Serial2.print(funcNum2Str(userdata.getAutoPlayFrom(),3));
+				Serial2.print(funcNum2Str(userdata.getAutoPlayTo(),3));
+				Serial2.print("END");
+				exec_mode = eExecLED;
+				return true;
 			}
 		}
 	}
-	//実行モードにする。
-	if(exec_mode != eExecLED){
-		LED_Mode = (char)userdata.getLedMode();
-		exec_mode = eExecLED;
-		funcUpDATAInitialize();
-	}
+	return false;
 }
 //****************************************************************
 //* ユーザーモードセッティング関数
-//　’Y’
-// Setting String Format 合計30byte 
+//　認識文字	’Y’
+// UserSetting String Format 合計30byte 
 //	0			1			2			3			4			5			6			7			8			9
 // 3byte		3byte		3byte		3byte		3byte		3byte		3byte		3byte		3byte		3byte		
 // "U01"		動作Mode	輝度		R値			G値			B値			"END"	//保存
@@ -489,10 +650,9 @@ bool funcUserSettings(){
 	int iUB;
 	if(Serial2.available() == 0) return false;
 	//読み込み 21 byte
-	bool chk;
-	chk = funcReadDATA(21);
+	if(!funcReadDATA(21)) return false;
 	//読み込み判定、終わりが「END」であるか？
-	if(chk && UpDATA[18] == 'E' && UpDATA[19] == 'N' && UpDATA[20] == 'D'){
+	if(UpDATA[18] == 'E' && UpDATA[19] == 'N' && UpDATA[20] == 'D'){
 		if(UpDATA[0] == 'U'){
 			if((UpDATA[1] == '0' && UpDATA[2] == '1') || (UpDATA[1] == '0' && UpDATA[2] == '2')){
 				bMM = (byte)UpDATA[5];
@@ -506,6 +666,8 @@ bool funcUserSettings(){
 					userdata.setUserLedMode(bMM);				
 					userdata.setUserBrightness(bUB);
 					userdata.setUserColor(&TCUser);
+					//ここで保存するように変更 2013/12/15
+					userdata.setExecMode((byte)eUser);
 				}
 				//動作設定値変更
 				User_LED_Mode = (char)bMM;
@@ -521,8 +683,9 @@ bool funcUserSettings(){
 		return false;
 	}
 }
+
 //****************************************************************
-//* データ読み込み関数
+//* シリアルポートからのデータ読み込み関数
 //* UpDATAに引数「ReadByte」読み込む　但し、MAXはDATA_LENGTH
 //****************************************************************
 bool funcReadDATA(int ReadByte, bool save){
@@ -548,46 +711,45 @@ bool funcReadDATA(int ReadByte, bool save){
 	}
 	return chk;
 }
+
 //****************************************************************
 //* LED 発光動作実行関数
-//* 動作関数にはモードチェック関数【chkModeChange】を含める事
 //****************************************************************
 void funcExec(){
 	if(exec_mode != eExecLED) return;
 	
-	userdata.setExecMode((byte)eExecLED);
+	//userdata.setExecMode((byte)eExecLED);
 	//USE_brightness = userdata.getUseBrightness();	
 	//delayTime = MIN_DELAY_TIME + userdata.getDelayTime();
 	
 	while(true){
 		if(exec_mode != eExecLED) return;
+		if(bolFuncCheckOut) return;
 		int i = 0;
 		//***********************************
 		//-->輝くカチューシャ
+		// 互換を維持したかったが、数字のため誤動作の原因になっている。よって英小文字のみの指定に変更する。2013/12/11
 		switch(LED_Mode){
-			case '1':
+			case 'o':
 				funcEguchiStar(g_t_color[0], LED_Mode, iCounter);
 				break;
-			case '2':
+			case 'p':
 				funcEguchiStar(g_t_color[1], LED_Mode, iCounter);
 				break;
-			case '3':
+			case 'q':
 				funcEguchiStar(g_t_color[2], LED_Mode, iCounter);	
 				break;
-			case '4':
+			case 'r':
 				funcEguchiStar(g_t_color[3], LED_Mode, iCounter);
 				break;
-			case '5':
+			case 's':
 				funcEguchiStar(g_t_color[4], LED_Mode, iCounter); 
 				break;
-			case '6':
+			case 't':
 				funcEguchiStar(g_t_color[5], LED_Mode, iCounter);  
 				break;
-			case '7':
+			case 'u':
 				funcEguchiStar(g_t_color[6], LED_Mode, iCounter);
-				break;
-			case '8':
-				funcEguchiStar(TCUser, LED_Mode, iCounter);
 				break;
 			//<-- 輝くカチューシャ
 			//*****************************
@@ -638,6 +800,8 @@ void funcExec(){
 				funcRainbow(LED_Mode);
 				break;
 			case 'i':
+				funcOff(LED_Mode, 50);
+				break;
 			default:
 				funcOff(LED_Mode, 50);
 				break;
@@ -649,14 +813,15 @@ void funcExec(){
 //****************************************************************
 void funcUserExec(){
 	if(exec_mode != eUser) return;
-
+	
 	User_LED_Mode = (char)userdata.getUserLedMode();
-	userdata.setExecMode((byte)eUser);
+	//userdata.setExecMode((byte)eUser);
 	USER_brightness = (byte)userdata.getUserBrightness();
 	userdata.getUserColor(&TCUser);
 	
 	while(true){
 		if(exec_mode != eUser) return;
+		if(bolFuncCheckOut) return;
 		switch(User_LED_Mode){
 			case 'a':
 				funcStar_User(User_LED_Mode);
@@ -679,44 +844,19 @@ void funcUserExec(){
 
 //****************************************************************
 //* LED 発光動作関数
+//* 動作関数にはモードチェック関数【chkModeChange】及び【chkAutoPlay】を含める事
 //****************************************************************
-// Slightly different, this makes the rainbow equally distributed throughout
-void rainbowCycle(byte wait, char mc) {
-  uint16_t i, j;
- 
-  for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
-    for(i=0; i< LED_length; i++) {
-       Wheel(i, ((i * 256 / LED_length) + j) & 255);
-    }
-    ledtape.send();
-	delay(wait);
-    //delay(wait + (delayTime - MIN_DELAY_TIME));
-	if(chkModeChange(mc)) return;
-  }
-}
 
-// Input a value 0 to 255 to get a color value.
-// The colours are a transition r - g - b - back to r.
-void Wheel(int index, byte WheelPos) {
-  if(WheelPos < 85) {
-    ledtape.setColor(index, (255 - WheelPos * 3), (WheelPos * 3), 0, LedTape::NoClearAndNoSend);
-  } else if(WheelPos < 170) {
-   WheelPos -= 85;
-    ledtape.setColor(index, 0, (255 - WheelPos * 3), (WheelPos * 3), LedTape::NoClearAndNoSend);
-  } else {
-   WheelPos -= 170;
-    ledtape.setColor(index, (WheelPos * 3), 0, (255 - WheelPos * 3), LedTape::NoClearAndNoSend);
-  }
-}
-
-//実行するファンクションの定義
 //星（江口さんのやつのループ）
 void funcStar(TColor tc, char mc, int mi){
 	ledtape.setAllBrightness(USE_brightness);
 	int star_count = 5;
 	int current_pos = 0;
 	while(true){
-		if(current_pos == (LED_length + star_count)) current_pos = 0; 
+		if(current_pos == (LED_length + star_count)){
+			current_pos = 0; 
+			if(chkAutoPlay()) return;
+		}
 		ledtape.clearAllColors();
 		for(int i = 0; i < (LED_length + star_count); ++i){
 			if(i > (current_pos - star_count) && i <= current_pos){
@@ -729,7 +869,7 @@ void funcStar(TColor tc, char mc, int mi){
 		ledtape.send();
 		delay(delayTime);
 		if(chkModeChange(mc)) return;
-		if(iCounter != mi) return;
+		if(iCounter != mi) return;	
 	}
 }
 
@@ -737,16 +877,26 @@ void funcStar(TColor tc, char mc, int mi){
 void funcLighting(TColor tc, char mc, int mi){
 	ledtape.setAllBrightness(USE_brightness);
 	ledtape.setAllColors(tc);
+	int autoplay_count = 0;
 	while(true){
 		delay(delayTime);
 		if(chkModeChange(mc)) return;
 		if(iCounter != mi) return;
+		++autoplay_count;
+		if(autoplay_count == 10){
+			autoplay_count = 0;
+			if(chkAutoPlay()) return;
+		}
 	}
 }
+
 //Twincle
 void funcStar1(TColor tc, char mc, int mi, bool b_randam){
 	ledtape.setAllBrightness(USE_brightness);
+	int my_delay_time = 0;
+	int autoplay_count = 0;
 	while(true){
+		my_delay_time = delayTime > MIN_DELAY_TIME ? delayTime - MIN_DELAY_TIME : 0;
 		randomSeed(millis());
 		int led = random(0, LED_length);
 		if(b_randam){
@@ -758,12 +908,18 @@ void funcStar1(TColor tc, char mc, int mi, bool b_randam){
 		//delay(1);
 		ledtape.clearAllColors();
 		int randam_delay_time = random(5, 150);
-		delay(randam_delay_time);
+		delay(randam_delay_time + my_delay_time);
 		if(chkModeChange(mc)) return;
 		if(iCounter != mi) return;
+		++autoplay_count;
+		if(autoplay_count == LED_length){
+			autoplay_count = 0;
+			if(chkAutoPlay()) return;
+		}
 	}
 	
 }
+
 //流星
 volatile void funcStar2(TColor tc, char mc, int mi, bool b_randam){
 	//色設定
@@ -795,7 +951,10 @@ volatile void funcStar2(TColor tc, char mc, int mi, bool b_randam){
 		}
 		++rCnt;
 		//ゼロリセット
-		if(rCnt == LightCount) rCnt = 0;
+		if(rCnt == LightCount){
+			rCnt = 0;
+			if(chkAutoPlay()) return;
+		}
 		//送信
 		ledtape.send();
 		delay(delayTime);
@@ -803,6 +962,7 @@ volatile void funcStar2(TColor tc, char mc, int mi, bool b_randam){
 		if(iCounter != mi) return;
 	}	
 }
+
 //点灯 色が流れるように順々に変わる
 void funcColorflowChg(char mc){
 	ledtape.setAllBrightness(USE_brightness);
@@ -814,6 +974,7 @@ void funcColorflowChg(char mc){
 				if(chkModeChange(mc)) return;
 			}
         }
+		if(chkAutoPlay()) return;
     }
 }
 
@@ -826,20 +987,26 @@ void funcLightingAllColorChg(char mc){
 			delay(delayTime * 40);
 			if(chkModeChange(mc)) return;
 		}
+		if(chkAutoPlay()) return;
     }
 }
 
 // 虹色表示
 void funcRainbow(char mc){
 	ledtape.setAllBrightness(USE_brightness);
+	int my_delay_time = 0;
     while(true)
     {
 	    for(int i = 0 ; i < 5 ; i++)
 		{
-			rainbowCycle(i, mc);
+			my_delay_time = delayTime > MIN_DELAY_TIME ? delayTime - MIN_DELAY_TIME : 0;
+			my_delay_time = my_delay_time < 26 ? 0 : my_delay_time - 26;	//デフォルトのスピード調整
+			rainbowCycle(i + my_delay_time, mc);
 			//注意：rainbowCycle内でchkModeChangeを呼んでいるのでここでは比較のみ。
 			if(LED_Mode != mc) return;
 			if(exec_mode != eExecLED) return;
+			//注意：rainbowCycle内でchkAutoPlayを呼んでいる。
+			if(bolFuncCheckOut) return;
 		}
     }
 }
@@ -849,6 +1016,7 @@ void funcGradient(char mc){
 	TColor tmp_c[LED_length];
 	TColor tc;
 	byte x;
+	int value_of_span = 10;
 	for(int i = 0; i < LED_length; ++i){
 		tmp_c[i].red = 0xFF;
 		tmp_c[i].green = 0xFF;
@@ -869,10 +1037,10 @@ void funcGradient(char mc){
 				do{
 					if(j < 2){
 						//--x;
-						x = (x - 4) < 0 ? 0 : (x - 4);
+						x = (x - value_of_span) < 0 ? 0 : (x - value_of_span);
 					}else{
 						//++x;
-						x = (x + 4) > 0xFF ? 0xFF : (x + 4);
+						x = (x + value_of_span) > 0xFF ? 0xFF : (x + value_of_span);
 					}
 					if(j == 0 || j == 2){
 						switch(i){
@@ -915,23 +1083,75 @@ void funcGradient(char mc){
 				}while(0 < x && x < 0xFF);		
 			}
 		}
-	}
-}
-//消す
-void funcOff(char mc, unsigned long ms){
-	ledtape.setAllColors(g_t_off);
-	while(true){
-		if(chkModeChange(mc)) return;
-		delay(ms);
+		if(chkAutoPlay()) return;
 	}
 }
 
+//消す
+void funcOff(char mc, unsigned long ms){
+	ledtape.setAllColors(g_t_off);
+	int autoplay_count = 0;
+	while(true){
+		if(chkModeChange(mc)) return;
+		delay(ms);
+		++autoplay_count;
+		if(autoplay_count == 10){
+			autoplay_count = 0;
+			if(chkAutoPlay()) return;
+		}
+	}
+}
+
+//*********************************************************************
+//* Rainbowで使用する関数
+//*->
+//*********************************************************************
+// Slightly different, this makes the rainbow equally distributed throughout
+void rainbowCycle(byte wait, char mc) {
+  uint16_t i, j;
+ 
+  for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
+    for(i=0; i< LED_length; i++) {
+       Wheel(i, ((i * 256 / LED_length) + j) & 255);
+    }
+    ledtape.send();
+	delay(wait);
+	if(chkModeChange(mc)) return;
+	if(j % 255 == 0) {
+		if(chkAutoPlay()) return;
+	}
+  }
+}
+
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+void Wheel(int index, byte WheelPos) {
+  if(WheelPos < 85) {
+    ledtape.setColor(index, (255 - WheelPos * 3), (WheelPos * 3), 0, LedTape::NoClearAndNoSend);
+  } else if(WheelPos < 170) {
+   WheelPos -= 85;
+    ledtape.setColor(index, 0, (255 - WheelPos * 3), (WheelPos * 3), LedTape::NoClearAndNoSend);
+  } else {
+   WheelPos -= 170;
+    ledtape.setColor(index, (WheelPos * 3), 0, (255 - WheelPos * 3), LedTape::NoClearAndNoSend);
+  }
+}
+//*********************************************************************
+//* <-
+//*********************************************************************
+
+//*********************************************************************
+//* ユーザーモード用関数
+//*********************************************************************
 void funcStar_User(char mc){
 	ledtape.setAllBrightness(USER_brightness);
 	int star_count = 5;
 	int current_pos = 0;
 	while(true){
-		if(current_pos == (LED_length + star_count)) current_pos = 0; 
+		if(current_pos == (LED_length + star_count)){
+			current_pos = 0;
+			if(chkAutoPlay()) return;
+		}
 		ledtape.clearAllColors();
 		for(int i = 0; i < (LED_length + star_count); ++i){
 			if(i > (current_pos - star_count) && i <= current_pos){
@@ -951,23 +1171,41 @@ void funcStar_User(char mc){
 void funcLighting_User(char mc){
 	ledtape.setAllBrightness(USER_brightness);
 	ledtape.setAllColors(TCUser);
+	int autoplay_count = 0;
 	while(true){
 		delay(delayTime);
 		if(chkUserModeChange(mc)) return;
+		if(chkAutoPlay()) return;
+		++autoplay_count;
+		if(autoplay_count == 10){
+			autoplay_count = 0;
+			if(chkAutoPlay()) return;
+		}
 	}
+	
 }
+
 //Twincle
 void funcStar1_User(char mc){
 	ledtape.setAllBrightness(USER_brightness);
+	int my_delay_time = 0;
+	int autoplay_count = 0;
 	while(true){
+		my_delay_time = delayTime > MIN_DELAY_TIME ? delayTime - MIN_DELAY_TIME : 0;
 		randomSeed(millis());
 		int led = random(0, LED_length);
 		ledtape.setColor(led, TCUser, LedTape::ClearAllAndAutoSend);
 		//delay(1);
 		ledtape.clearAllColors();
 		int random_delay_time = random(5, 150);
-		delay(random_delay_time + (delayTime - MIN_DELAY_TIME));
+		delay(random_delay_time + my_delay_time);
 		if(chkUserModeChange(mc)) return;
+		if(chkAutoPlay()) return;
+		++autoplay_count;
+		if(autoplay_count == LED_length){
+			autoplay_count = 0;
+			if(chkAutoPlay()) return;
+		}
 	}
 }
 
@@ -997,7 +1235,10 @@ volatile void funcStar2_User(char mc){
 		}
 		++rCnt;
 		//ゼロリセット
-		if(rCnt == LightCount) rCnt = 0;
+		if(rCnt == LightCount){
+			rCnt = 0;
+			if(chkAutoPlay()) return;
+		}
 		//送信
 		ledtape.send();
 		delay(delayTime);
@@ -1005,7 +1246,9 @@ volatile void funcStar2_User(char mc){
 	}
 }
 
-//輝くカチューシャ
+//*********************************************************************
+//* 輝くカチューシャ
+//*********************************************************************
 void funcEguchiStar(TColor tc, char mc, int mi, unsigned long ms){
 	int MyCounter = mi;
 	ledtape.setAllBrightness(USER_brightness);
@@ -1033,8 +1276,18 @@ void funcEguchiStar(TColor tc, char mc, int mi, unsigned long ms){
 			MyCounter = iCounter;
 			break;
 		}
+		//***************************************************
+		//AutoPlayが設定された場合にこのファンクションから抜けるために必要。
+		if(AutoPlay){
+			bolFuncCheckOut = true;
+			return;
+		}
 	}
 }
+
+//*********************************************************************
+// 文字通信処理用関数
+//*********************************************************************
 //*********************************************************************
 //* 数値文字の左側のゼロを除去する
 //* 引数　【数値文字列】
@@ -1097,10 +1350,6 @@ int funcStr2Num(String str){
 //* 文字→数字変換関数
 //* 引数　【文字配列（char[]）】、【桁数（int）】
 //*********************************************************************
-//*********************************************************************
-//* 文字→数字変換関数
-//* 引数　【文字配列（char[]）】、【桁数（int）】
-//*********************************************************************
 int funcCharArray2Num(char ch[], int len){
 	int result = 0;
 	for(int i = 0; i < len; ++i){
@@ -1131,6 +1380,7 @@ int getNumberTo3CharArray(char ch[],int start){
 byte int2byte(int val){
 	return (byte)(val & 0xFF);
 }
+
 //*********************************************************************
 //* UpDATA Initialize
 //*********************************************************************
@@ -1138,49 +1388,4 @@ void funcUpDATAInitialize(){
 	for(int i = 0; i < DATA_LENGTH; ++i){
 		UpDATA[i] = 0x00;
 	}
-}
-//*********************************************************************
-//* デバック用KURUMI LED 関数
-//*********************************************************************
-void funcKurumiLEDRed(){
-	digitalWrite(led_red, LOW);
-	digitalWrite(led_green, HIGH);
-	digitalWrite(led_blue, HIGH);
-	delay(KURUKI_LED_DELAY);
-}
-void funcKurumiLEDGreen(){
-	digitalWrite(led_red, HIGH);
-	digitalWrite(led_green, LOW);
-	digitalWrite(led_blue, HIGH);
-	delay(KURUKI_LED_DELAY);
-}
-void funcKurumiLEDBlue(){
-	digitalWrite(led_red, HIGH);
-	digitalWrite(led_green, HIGH);
-	digitalWrite(led_blue, LOW);
-	delay(KURUKI_LED_DELAY);
-}
-void funcKurumiLEDYellow(){
-	digitalWrite(led_red, LOW);
-	digitalWrite(led_green, LOW);
-	digitalWrite(led_blue, HIGH);
-	delay(KURUKI_LED_DELAY);
-}
-void funcKurumiLEDAqua(){
-	digitalWrite(led_red, HIGH);
-	digitalWrite(led_green, LOW);
-	digitalWrite(led_blue, LOW);
-	delay(KURUKI_LED_DELAY);
-}
-void funcKurumiLEDFechsia(){
-	digitalWrite(led_red, LOW);
-	digitalWrite(led_green, HIGH);
-	digitalWrite(led_blue, LOW);
-	delay(KURUKI_LED_DELAY);
-}
-void funcKurumiLEDWhite(){
-	digitalWrite(led_red, LOW);
-	digitalWrite(led_green, LOW);
-	digitalWrite(led_blue, LOW);
-	delay(KURUKI_LED_DELAY);
 }
