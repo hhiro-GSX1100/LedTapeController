@@ -92,7 +92,7 @@ bool AutoPlay = false;
 bool bolFuncCheckOut = false;
 int autoplay_start_point = 0, autoplay_end_point = 0;
 int autoplay_point = 0;
-int autoplay_loops = 5;	//autoplay実行回数値
+int autoplay_loops = 0;	//autoplay実行回数値
 int autoplay_loop_count = 0;	//autoplayカウンタ
 
 
@@ -402,6 +402,7 @@ void NextAutoPlay(){
 void StopAutoPlay(){
 	if(!AutoPlay) return;
 	AutoPlay = false;
+	autoplay_loops = 0;
 	autoplay_loop_count = 0;
 	userdata.setAutoPlay(0x00);
 	loadUserData();
@@ -504,12 +505,13 @@ bool funcSettings(){
 
 					//**********************************************************************
 					// 格納データの読み込み
-					LED_length = userdata.getLEDs();
+					loadUserData();
+					//LED_length = userdata.getLEDs();
 					ledtape.setLEDs(LED_length);
-					USE_brightness = userdata.getUseBrightness();
-					LED_Mode = (char)userdata.getLedMode();
-					iCounter = (int)userdata.getMoveCount();
-					MAX_brightness = userdata.getMaxBrightness();
+					//USE_brightness = userdata.getUseBrightness();
+					//LED_Mode = (char)userdata.getLedMode();
+					//iCounter = (int)userdata.getMoveCount();
+					//MAX_brightness = userdata.getMaxBrightness();
 					
 					return true;
 					
@@ -520,12 +522,13 @@ bool funcSettings(){
 					
 					//**********************************************************************
 					// 格納データの読み込み
-					LED_length = userdata.getLEDs();
+					loadUserData();
+					//LED_length = userdata.getLEDs();
 					ledtape.setLEDs(LED_length);
-					USE_brightness = userdata.getUseBrightness();
-					LED_Mode = (char)userdata.getLedMode();
-					iCounter = (int)userdata.getMoveCount();
-					MAX_brightness = userdata.getMaxBrightness();
+					//USE_brightness = userdata.getUseBrightness();
+					//LED_Mode = (char)userdata.getLedMode();
+					//iCounter = (int)userdata.getMoveCount();
+					//MAX_brightness = userdata.getMaxBrightness();
 					
 					return true;
 
@@ -814,10 +817,10 @@ void funcExec(){
 void funcUserExec(){
 	if(exec_mode != eUser) return;
 	
-	User_LED_Mode = (char)userdata.getUserLedMode();
+	//User_LED_Mode = (char)userdata.getUserLedMode();
 	//userdata.setExecMode((byte)eUser);
-	USER_brightness = (byte)userdata.getUserBrightness();
-	userdata.getUserColor(&TCUser);
+	//USER_brightness = (byte)userdata.getUserBrightness();
+	//userdata.getUserColor(&TCUser);
 	
 	while(true){
 		if(exec_mode != eUser) return;
@@ -1175,7 +1178,6 @@ void funcLighting_User(char mc){
 	while(true){
 		delay(delayTime);
 		if(chkUserModeChange(mc)) return;
-		if(chkAutoPlay()) return;
 		++autoplay_count;
 		if(autoplay_count == 10){
 			autoplay_count = 0;
@@ -1200,7 +1202,6 @@ void funcStar1_User(char mc){
 		int random_delay_time = random(5, 150);
 		delay(random_delay_time + my_delay_time);
 		if(chkUserModeChange(mc)) return;
-		if(chkAutoPlay()) return;
 		++autoplay_count;
 		if(autoplay_count == LED_length){
 			autoplay_count = 0;
