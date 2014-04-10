@@ -33,7 +33,7 @@ void UserData::initialize(bool initMemoryOffset){
 		EEPROM.write(MEMORY_OFFSET_VALUE_ADDRESS, 0x00);	//メモリ保存オフセット値
 		m_MemoryPoint = DATA_OFFSET;						//(0x00 * DATA_CAPACITY) + DATA_OFFSET;
 	}
-	EEPROM.write(getMemoryPoint(eLEDs), 0x13);				//初期値：19
+	EEPROM.write(getMemoryPoint(eLEDs), 19);				//初期値：19
 	EEPROM.write(getMemoryPoint(eMaxBrightness), 0x80);		//初期値：128
 	EEPROM.write(getMemoryPoint(eUseBrightness), 0x80);		//初期値：128
 	EEPROM.write(getMemoryPoint(eLedMode), (byte)'a');		//初期値：'a'
@@ -47,6 +47,12 @@ void UserData::initialize(bool initMemoryOffset){
 	EEPROM.write(getMemoryPoint(eDelayTime), 0x14);			//初期値：20
 	EEPROM.write(getMemoryPoint(eLoops), 0x05);				//初期値：5	
 	EEPROM.write(getMemoryPoint(eLoopExecMode), 0x00);		//初期値：0
+	EEPROM.write(getMemoryPoint(eEarringRed), 0x00);		//初期値：0
+	EEPROM.write(getMemoryPoint(eEarringGreen), 0x00);		//初期値：0
+	EEPROM.write(getMemoryPoint(eEarringBlue), 0x00);		//初期値：0
+	EEPROM.write(getMemoryPoint(eEarringBrightness), 0x00);	//初期値：0
+	EEPROM.write(getMemoryPoint(eEarringSpeed), 0x0a);		//初期値：10
+	EEPROM.write(getMemoryPoint(eEarringMode), (byte)'a');	//初期値：'a'
 	
 	EEPROM.write(getMemoryPoint(eInit), INIT_VALUE);		//設定完了値：0x80
 };
@@ -118,7 +124,20 @@ byte UserData::getLoops(){
 byte UserData::getLoopExecMode(){
 	return (byte)EEPROM.read(getMemoryPoint(eLoopExecMode));
 };	
-
+void UserData::getEarringColor(TColor *tc){
+	tc->red = (byte)EEPROM.read(getMemoryPoint(eEarringRed));
+	tc->green = (byte)EEPROM.read(getMemoryPoint(eEarringGreen));
+	tc->blue = (byte)EEPROM.read(getMemoryPoint(eEarringBlue));
+};
+byte UserData::getEarringBrightness(){
+	return (byte)EEPROM.read(getMemoryPoint(eEarringBrightness));
+};
+byte UserData::getEarringSpeed(){
+	return (byte)EEPROM.read(getMemoryPoint(eEarringSpeed));
+};
+byte UserData::getEarringMode(){
+	return (byte)EEPROM.read(getMemoryPoint(eEarringMode));
+};
 //メモリ格納値ループに使用するgetter等関数
 bool UserData::isEnableOffsetRange(byte offset_pos){
 	if(isManagedOffsetRange(offset_pos)){
@@ -126,6 +145,12 @@ bool UserData::isEnableOffsetRange(byte offset_pos){
 	}
 	return false;
 };	
+byte UserData::getLEDs(byte offset_pos){
+	if(isManagedOffsetRange(offset_pos)){
+		return (byte)EEPROM.read(getMemoryPoint(offset_pos, eLEDs));
+	}
+	return 19;
+};
 byte UserData::getUseBrightness(byte offset_pos){
 	if(isManagedOffsetRange(offset_pos)){
 		return (byte)EEPROM.read(getMemoryPoint(offset_pos, eUseBrightness));
@@ -187,7 +212,31 @@ byte UserData::getLoopExecMode(byte offset_pos){
 	}
 	return 0x00;
 };
-
+void UserData::getEarringColor(byte offset_pos, TColor *tc){
+	if(isManagedOffsetRange(offset_pos)){
+		tc->red = (byte)EEPROM.read(getMemoryPoint(offset_pos, eEarringRed));
+		tc->green = (byte)EEPROM.read(getMemoryPoint(offset_pos, eEarringGreen));
+		tc->blue = (byte)EEPROM.read(getMemoryPoint(offset_pos, eEarringBlue));
+	}
+};
+byte UserData::getEarringBrightness(byte offset_pos){
+	if(isManagedOffsetRange(offset_pos)){
+		return (byte)EEPROM.read(getMemoryPoint(offset_pos, eEarringBrightness));
+	}
+	return 0x00;
+};
+byte UserData::getEarringSpeed(byte offset_pos){
+	if(isManagedOffsetRange(offset_pos)){
+		return (byte)EEPROM.read(getMemoryPoint(offset_pos, eEarringSpeed));
+	}
+	return 0x00;
+};
+byte UserData::getEarringMode(byte offset_pos){
+	if(isManagedOffsetRange(offset_pos)){
+		return (byte)EEPROM.read(getMemoryPoint(offset_pos, eEarringMode));
+	}
+	return 0x00;
+};
 //******************************************************
 //* setter
 //******************************************************
@@ -201,6 +250,8 @@ void UserData::setAutoPlayTo(byte AT){
 	if(EEPROM.read(AUTOPLAY_TO) != AT) EEPROM.write(AUTOPLAY_TO, AT);
 };
 void UserData::setLEDs(byte LC){
+	//LED NUMBER Limitter 
+	if(LC > MAX_OF_LED_NUMBERS) LC = MAX_OF_LED_NUMBERS;
 	if(EEPROM.read(getMemoryPoint(eLEDs)) != LC) EEPROM.write(getMemoryPoint(eLEDs), LC);
 };
 void UserData::setMaxBrightness(byte MB){
@@ -238,7 +289,20 @@ void UserData::setLoops(byte Loops){
 void UserData::setLoopExecMode(byte LoopExecMode){
 	if(EEPROM.read(getMemoryPoint(eLoopExecMode)) != LoopExecMode) EEPROM.write(getMemoryPoint(eLoopExecMode), LoopExecMode);
 };
-
+void UserData::setEarringColor(TColor *tc){
+	if(EEPROM.read(getMemoryPoint(eEarringRed)) != tc->red) EEPROM.write(getMemoryPoint(eEarringRed), (byte)tc->red);
+	if(EEPROM.read(getMemoryPoint(eEarringGreen)) != tc->green) EEPROM.write(getMemoryPoint(eEarringGreen), (byte)tc->green);
+	if(EEPROM.read(getMemoryPoint(eEarringBlue)) != tc->blue) EEPROM.write(getMemoryPoint(eEarringBlue), (byte)tc->blue);
+};
+void UserData::setEarringBrightness(byte EB){
+	if(EEPROM.read(getMemoryPoint(eEarringBrightness)) != EB) EEPROM.write(getMemoryPoint(eEarringBrightness), EB);
+};
+void UserData::setEarringSpeed(byte ES){
+	if(EEPROM.read(getMemoryPoint(eEarringSpeed)) != ES) EEPROM.write(getMemoryPoint(eEarringSpeed), ES);
+};
+void UserData::setEarringMode(byte EM){
+	if(EEPROM.read(getMemoryPoint(eEarringMode)) != EM) EEPROM.write(getMemoryPoint(eEarringMode), EM);
+};
 //******************************************************
 //* public function
 //******************************************************

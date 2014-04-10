@@ -24,9 +24,9 @@ void ColorLED::setup(int RedPin, int GreenPin, int BluePin, int On_Value, unsign
 	if(chkEnablePin(RedPin)) LED_RED_PIN = RedPin;
 	if(chkEnablePin(GreenPin)) LED_GREEN_PIN = GreenPin;
 	if(chkEnablePin(BluePin)) LED_BLUE_PIN = BluePin;
-	if(enableAnalogWrite(LED_RED_PIN)) m_RED_enableAnalog = true;
-	if(enableAnalogWrite(LED_GREEN_PIN)) m_GREEN_enableAnalog = true;
-	if(enableAnalogWrite(LED_BLUE_PIN)) m_BLUE_enableAnalog = true;
+	m_RED_enableAnalog = enableAnalogWrite(LED_RED_PIN);
+	m_GREEN_enableAnalog = enableAnalogWrite(LED_GREEN_PIN);
+	m_BLUE_enableAnalog = enableAnalogWrite(LED_BLUE_PIN);
 	setOnValue(On_Value);
 	setDelay(delay_ms);
 	//**********************************************************************
@@ -49,6 +49,9 @@ void ColorLED::setOnValue(int On_Value){
 };
 void ColorLED::setDelay(unsigned long ms){
 	m_delay = ms;
+};
+void ColorLED::setBrightness(byte brightness){
+	m_brightness = brightness;
 };
 void ColorLED::Red(){
 	digitalWrite(LED_RED_PIN, LED_ON);
@@ -187,11 +190,10 @@ bool ColorLED::enableAnalogWrite(int ChkPin){
 	return bChk;
 };
 //
-void ColorLED::LightingLED(int red_value, int green_value, int blue_value){
-	int r, g, b;
-	r = get8BitValue(red_value);
-	g = get8BitValue(green_value);
-	b = get8BitValue(blue_value); 
+void ColorLED::LightingLED(byte red_value, byte green_value, byte blue_value){
+	int r = (int)(((unsigned int)(red_value) * (unsigned int)(m_brightness)) / 255.0);
+	int g = (int)(((unsigned int)(green_value) * (unsigned int)(m_brightness)) / 255.0);
+	int b = (int)(((unsigned int)(blue_value) * (unsigned int)(m_brightness)) / 255.0);
 	if(m_RED_enableAnalog){
 		analogWrite(LED_RED_PIN, r);
 	}else{
@@ -212,20 +214,19 @@ void ColorLED::LightingLED(int red_value, int green_value, int blue_value){
 	}
 	MyDelay();
 };
-int ColorLED::get8BitValue(int value){
-	if(value < 0){
-		return 0;
-	}else if(0 <= value && value <= 255){
-		return value;
-	}else{
-		return 255;
-	} 
+//
+void ColorLED::LightingLED(byte red_value, byte green_value, byte blue_value, byte brightness){
+	m_brightness = brightness;
+	LightingLED(red_value, green_value, blue_value);
 };
 void ColorLED::MyDelay(){
 	if(m_delay > 0){
 		delay(m_delay);
 	}
 };
+int ColorLED::byte2int(byte b){
+	return (int)((unsigned int)(b));
+}
 
 
 

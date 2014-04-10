@@ -27,9 +27,10 @@ class ColorLED{
 		ColorLED(int On_Value = LOW);
 		~ColorLED();
 		//setupはスケッチのsetup以降で呼ぶこと。
-		void setup(int RedPin = 22, int GreenPin = 23, int BluePin = 24, int On_Value = LOW, unsigned long delay_ms = 30);
+		void setup(int RedPin = 22, int GreenPin = 23, int BluePin = 24, int On_Value = LOW, unsigned long delay_ms = 0);
 		void setOnValue(int On_Value = LOW);
-		void setDelay(unsigned long ms = 30);
+		void setDelay(unsigned long ms);
+		void setBrightness(byte brightness);
 		//*******************************************************************************
 		//* 以下は発光させるメソッド。
 		//*******************************************************************************
@@ -53,7 +54,8 @@ class ColorLED{
 		void Olive();
 		void Navy();
 		void Teal();
-		void LightingLED(int red_value = 255, int green_value = 255, int blue_value = 255);
+		void LightingLED(byte red_value, byte green_value, byte blue_value);
+		void LightingLED(byte red_value, byte green_value, byte blue_value, byte brightness);
 	private:
 		//*********************************************************************
 		// Pin 22,23,24 are assigned to RGB LEDs.
@@ -65,19 +67,19 @@ class ColorLED{
 		bool m_RED_enableAnalog;
 		bool m_GREEN_enableAnalog;
 		bool m_BLUE_enableAnalog;		
-		unsigned long m_delay;
+		unsigned long m_delay = 0;
+		byte m_brightness = 0xff;
 		static const int MIN_PIN_NO = 0;
 		static const int MAX_PIN_NO = 24;
-		static const int enableAnalogWritePinCount = 9;
+		static const int enableAnalogWritePinCount = 6;
 		//アナログ出力が可能なピン番号（3, 5, 6, 9, 10, 11, 22, 23, 24）
-		const int enableAnalogWritePinNo[enableAnalogWritePinCount] = {3, 5, 6, 9, 10, 11, 22, 23, 24};
+		const int enableAnalogWritePinNo[enableAnalogWritePinCount] = {3, 5, 6, 9, 10, 11};
 		//使用可能なPin（0～24）をチェックする関数
 		bool chkEnablePin(int ChkPin);
 		//analogWriteが使用可能なPinかチェックする関数
 		bool enableAnalogWrite(int ChkPin);
-		//0～255の値に制限する関数
-		int get8BitValue(int value);
 		void MyDelay();
+		int byte2int(byte b);
 };
 
-#endif // _KURUMILED_H_
+#endif // _COLORLED_H_
