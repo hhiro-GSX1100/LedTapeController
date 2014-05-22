@@ -545,13 +545,13 @@ inline void LedTape::wait_T0H(void){
 inline void LedTape::wait_T0L(void){
     NOP();NOP();NOP();NOP();NOP();
     NOP();NOP();NOP();NOP();NOP();
-    NOP();NOP();
+    NOP();NOP();NOP();NOP();NOP();
 };
 
 inline void LedTape::wait_T1H(void){
     NOP();NOP();NOP();NOP();NOP();
     NOP();NOP();NOP();NOP();NOP();
-    NOP();NOP();
+    NOP();NOP();NOP();NOP();NOP();
 };
 
 inline void LedTape::wait_T1L(void){
