@@ -25,14 +25,14 @@
 #define OUTPUT_HIGH *m_Px |= m_On_u8Bit		// 出力をHIGHに設定
 #define OUTPUT_LOW  *m_Px &= m_Off_u8Bit		// 出力をLOWに設定
 
-#define T0H; asm("nop;");asm("nop;");asm("nop;");
+#define T0H; asm("nop;");asm("nop;");asm("nop;");asm("nop;");asm("nop;");
 #define T0L; asm("nop;");asm("nop;");asm("nop;");asm("nop;");asm("nop;");\
              asm("nop;");asm("nop;");asm("nop;");asm("nop;");asm("nop;");\
              asm("nop;");asm("nop;");
 #define T1H; asm("nop;");asm("nop;");asm("nop;");asm("nop;");asm("nop;");\
              asm("nop;");asm("nop;");asm("nop;");asm("nop;");asm("nop;");\
              asm("nop;");asm("nop;");asm("nop;");asm("nop;");asm("nop;");\
-             asm("nop;");asm("nop;");
+             asm("nop;");asm("nop;");asm("nop;");asm("nop;");
 #define T1L; ;
 // 2017/09/09 -->
 
