@@ -1,5 +1,5 @@
-﻿//*************************************************************************************************
-//* Author: hiro 2014/02/10 V2.0
+//*************************************************************************************************
+//* Author: hiro 2014/02/10 V2.0  2017/09/09 Update for New KURUMI Library
 //* スイッチサイエンスのシリアルLED用のクラス
 //* 送信データのタイミングの問題からPINに直接アサインする。
 //* コンストラクタでPINを指定すること。　【例】 LedTape t = LedTape(3);
@@ -8,7 +8,10 @@
 #ifndef _LEDTAPE_H_
 #define _LEDTAPE_H_
 
-#include <RLduino78.h>
+//<-- 2017/09/09 
+//#include <RLduino78.h>
+#include <Arduino.h>
+// 2017/09/09 -->
 #include "iodefine.h"
 
 //*************************************************************
@@ -17,6 +20,21 @@
 #define LED_BRIGHTNESS  120             // 初期輝度
 #define INIT_LEDS       1              // 初期LED個数
 #define MAX_OF_LED_NUMBERS 255            //使用可能な最大LED数
+//<-- 2017/09/09 
+#define NOP(); asm("nop;");
+#define OUTPUT_HIGH *m_Px |= m_On_u8Bit		// 出力をHIGHに設定
+#define OUTPUT_LOW  *m_Px &= m_Off_u8Bit		// 出力をLOWに設定
+
+#define T0H; asm("nop;");asm("nop;");asm("nop;");
+#define T0L; asm("nop;");asm("nop;");asm("nop;");asm("nop;");asm("nop;");\
+             asm("nop;");asm("nop;");asm("nop;");asm("nop;");asm("nop;");\
+             asm("nop;");asm("nop;");
+#define T1H; asm("nop;");asm("nop;");asm("nop;");asm("nop;");asm("nop;");\
+             asm("nop;");asm("nop;");asm("nop;");asm("nop;");asm("nop;");\
+             asm("nop;");asm("nop;");asm("nop;");asm("nop;");asm("nop;");\
+             asm("nop;");asm("nop;");
+#define T1L; ;
+// 2017/09/09 -->
 
 //!< 入植ポート・レジスタ・ベースアドレス
 #define getPortOutputRegisterAddr(port)		((volatile uint8_t*)(ADDR_PORT_REG + port))	
@@ -112,13 +130,15 @@ class LedTape
         void setColor(int pos, byte r, byte g, byte b);
         void setColor(int pos, TColor c);
         void getColor(int pos, byte *r, byte *g, byte *b);
-		void code_1();
-		void code_0();
-        void wait_T0H(void);
-        void wait_T0L(void);
-        void wait_T1H(void);
-        void wait_T1L(void);
-        void test(void);
+        //<-- 2017/09/09
+		//void code_1();
+		//void code_0();
+        //void wait_T0H(void);
+        //void wait_T0L(void);
+        //void wait_T1H(void);
+        //void wait_T1L(void);
+        //void test(void);
+        // 2017/09/09 -->
 };
 
 #endif // _LEDTAPE_H_

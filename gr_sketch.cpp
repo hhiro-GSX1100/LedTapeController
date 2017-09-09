@@ -1,8 +1,11 @@
-﻿/*GR-KURUMI Sketch Template Version: E0.94*/
+/*GR-KURUMI Sketch Template Version: E0.94*/
 //*************************************************************************************************
 //* Author: hiro 2014/02/10 V2.0
 //*************************************************************************************************
-#include <RLduino78.h>
+//<-- 2017/09/09
+//#include <RLduino78.h>
+#include <Arduino.h>
+// 2017/09/09 -->
 #include "iodefine.h"
 #include "LedTape.h"
 #include "UserData.h"
@@ -185,7 +188,7 @@ void setup() {
     
     kurumiLED.White();
     delay(500);
-    
+
     //AUTOPLAY
     if(userdata.getAutoPlay() == 1){
         StartAutoPlay(userdata.getAutoPlayFrom(), userdata.getAutoPlayTo());

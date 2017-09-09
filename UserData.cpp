@@ -1,4 +1,4 @@
-﻿#include "UserData.h"
+#include "UserData.h"
 //コンストラクタ setup　以前にインスタンス化されるとEEPROMが使用できずバグになる。
 //よってコンストラクタでは処理しない。
 UserData::UserData(){

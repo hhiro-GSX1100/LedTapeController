@@ -1,5 +1,5 @@
-﻿//*************************************************************************************************
-//* Author: hiro 2014/02/10 V2.0
+//*************************************************************************************************
+//* Author: hiro 2014/02/10 V2.0  2017/09/09 Update for New KURUMI Library
 //*************************************************************************************************
 #include "LedTape.h"
 
@@ -14,6 +14,9 @@ LedTape::LedTape(byte Pin){
 	m_On_u8Bit  = g_au8DigitalPinMaskTable[m_pin];
 	m_Off_u8Bit = ~m_On_u8Bit;
 	m_Px = getPortOutputRegisterAddr(m_u8Port);
+	//<-- 2017/09/09
+	pinMode(Pin, OUTPUT);
+	// 2017/09/09 -->
 };
 //デストラクタ
 LedTape::~LedTape(){
@@ -469,7 +472,105 @@ volatile void LedTape::send(void){
     for(int i = 0; i < numBytes ; ++i){
         val = *ptr;
 		if(ptr != ptr_end) ptr++;
-        
+//<-- 2017/09/09
+        if(val & 0x80){
+          OUTPUT_HIGH;
+          T1H;
+          OUTPUT_LOW;
+          T1L;
+        }else{
+          OUTPUT_HIGH;
+          T0H;
+          OUTPUT_LOW;
+          T0L;
+        }
+
+        if(val & 0x40){
+          OUTPUT_HIGH;
+          T1H;
+          OUTPUT_LOW;
+          T1L;
+        }else{
+          OUTPUT_HIGH;
+          T0H;
+          OUTPUT_LOW;
+          T0L;
+        }
+
+        if(val & 0x20){
+          OUTPUT_HIGH;
+          T1H;
+          OUTPUT_LOW;
+          T1L;
+        }else{
+          OUTPUT_HIGH;
+          T0H;
+          OUTPUT_LOW;
+          T0L;
+        }
+
+        if(val & 0x10){
+          OUTPUT_HIGH;
+          T1H;
+          OUTPUT_LOW;
+          T1L;
+        }else{
+          OUTPUT_HIGH;
+          T0H;
+          OUTPUT_LOW;
+          T0L;
+        }
+
+        if(val & 0x08){
+          OUTPUT_HIGH;
+          T1H;
+          OUTPUT_LOW;
+          T1L;
+        }else{
+          OUTPUT_HIGH;
+          T0H;
+          OUTPUT_LOW;
+          T0L;
+        }
+
+        if(val & 0x04){
+          OUTPUT_HIGH;
+          T1H;
+          OUTPUT_LOW;
+          T1L;
+        }else{
+          OUTPUT_HIGH;
+          T0H;
+          OUTPUT_LOW;
+          T0L;
+        }
+
+        if(val & 0x02){
+          OUTPUT_HIGH;
+          T1H;
+          OUTPUT_LOW;
+          T1L;
+        }else{
+          OUTPUT_HIGH;
+          T0H;
+          OUTPUT_LOW;
+          T0L;
+        }
+
+        if(val & 0x01){
+          OUTPUT_HIGH;
+          T1H;
+          OUTPUT_LOW;
+          T1L;
+        }else{
+          OUTPUT_HIGH;
+          T0H;
+          OUTPUT_LOW;
+          T0L;
+        }
+    }
+// 2017/09/09 -->
+/*<-- 2017/09/09        
         if(val & 0x80){
           code_1();
         }else{
@@ -518,12 +619,14 @@ volatile void LedTape::send(void){
           code_0();
         }
     }
+//2017/09/09 -->*/    
     interrupts();
     endTime = micros(); // Save EOD time for latch on next call
 };
 
 //*******************************************************************************************
 //private
+/*<-- 2017/09/09
 inline void LedTape::code_1(){
 	*m_Px |= m_On_u8Bit;		// 出力をHIGHに設定
 	wait_T1H();
@@ -564,3 +667,4 @@ void LedTape::test(void){
         code_1();
     }
 };
+//2017/09/09 -->*/
